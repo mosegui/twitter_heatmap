@@ -14,6 +14,11 @@ import pandas as pd
 
 #======= TWITTER API CREDENTIALS ==============
 
+# The file 'twitter_API_credentials.json' is listed in .gitignore
+# and therefore not pushed to into the GitHub repository. For illustrative
+# purposes of the JSON layout, the file 'dummy_twitter_API_credentials.json' 
+#  is added.
+
 with open('twitter_API_credentials.json') as twitter_credentials:
     twitterID = json.load(twitter_credentials)
 
