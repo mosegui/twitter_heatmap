@@ -14,14 +14,18 @@ import pandas as pd
 
 #======= TWITTER API CREDENTIALS ==============
 
-consumer_key = 'xo0iRYbtElz7tc6hg4G3DEZQd'
-consumer_secret = 'X5wbLZpGsYXTXHnykYyWVXSRjLtI3IGwd0gLeJJLIXwxpQtWAP'
-access_token = '834845430932525056-zqPhMFGH51hJeGhAYZi1q5APw4mBy60'
-access_secret = 'mkPUHvddNNB1S2fmgEXXHpcHwo5nJKE6sUYIAE5t9i5SC'
+with open('twitter_API_credentials.json') as twitter_credentials:
+    twitterID = json.load(twitter_credentials)
+
+consumer_key = twitterID['consumer_key']
+consumer_secret = twitterID['consumer_secret']
+access_token = twitterID['access_token']
+access_secret = twitterID['access_secret']
 
 #======= CREATE SQL DATABASE ==============
 
-conn = sqlite3.connect('mongo.db')
+#conn = sqlite3.connect('mongo.db')
+conn = sqlite3.connect(':memory:')
 c = conn.cursor()
 c.execute("""CREATE TABLE tweets (
         timestamp REAL,
