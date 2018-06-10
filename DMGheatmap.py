@@ -20,7 +20,17 @@ logging.basicConfig(level = logging.INFO)
 logger = logging.getLogger('heatmap')
 
 ############################################################################################################################3
-            
+         
+def empty_df(*args):
+    """
+    return an empty dataframe with the column names passed as arguments in a list
+    """
+    list_of_columns = [arg for arg in args]
+    
+    return pd.DataFrame([], columns=list_of_columns)
+
+
+
 class pandas_to_sql(threading.Thread):
     def __init__(self):
         super().__init__()
@@ -59,22 +69,16 @@ class pandas_to_sql(threading.Thread):
         
         global dummy_df
         
-        cursor, connection = self.create_sql_database('tweets', db_filename= 'lalala.db', on_memory = False)
+        cursor, connection = self.create_sql_database('tweets', db_filename= 'lolo.db', on_memory = False)
         
         while not self.event.is_set():
-            time.sleep(9)
+            time.sleep(27)
             logger.info('********************************************************************************************len(dummy_df): {}'.format(len(dummy_df)))
             
             dummy_df.to_sql('tweets', connection, if_exists = 'append', index = False)
-                        
-            dummy_df = pd.DataFrame([], columns=['Timestamp',
-                                   'Longitude',
-                                   'Latitude',
-                                   'Language',
-                                   'Country',
-                                   'Country_Code',
-                                   'Place_Name',
-                                   'Place_Type'])
+
+            dummy_df = empty_df('Timestamp', 'Longitude', 'Latitude', 'Language',
+                                'Country', 'Country_Code', 'Place_Name', 'Place_Type')
             
             logger.warning('+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ DATA MOVED!!')
             
@@ -90,19 +94,16 @@ class tweet_listener(tp.StreamListener):
     def __init__(self, timeout):
         super().__init__(self)
         self.starting_time = time.time()
-        self.time_limit = timeout
+        self.timeout = timeout
 
         global dummy_df
-        dummy_df = pd.DataFrame([], columns=['Timestamp',
-                                   'Longitude',
-                                   'Latitude',
-                                   'Language',
-                                   'Country',
-                                   'Country_Code',
-                                   'Place_Name',
-                                   'Place_Type'])
+        
+        dummy_df = empty_df('Timestamp', 'Longitude', 'Latitude', 'Language',
+                            'Country', 'Country_Code', 'Place_Name', 'Place_Type')
             
     def on_data(self, data):
+        
+        global dummy_df
 
         while (time.time() - self.starting_time) <= self.time_limit:
             decoded_json = json.loads(data)
@@ -119,7 +120,7 @@ class tweet_listener(tp.StreamListener):
                     place_type = decoded_json['place']['place_type']
                     
                     
-                    global dummy_df
+                    
                     dummy_df = dummy_df.append({'Timestamp': timestamp[0],
                                                           'Longitude':longitude[0],
                                                           'Latitude':latitude[0],
@@ -138,7 +139,7 @@ class tweet_listener(tp.StreamListener):
             except:
                 pass # tweets with no ['place'] key are internal API messages
             return True
-        logger.info('TIME IS UP!!! ({} sec)'.format(self.time_limit))
+        logger.info('TIME IS UP!!! ({} sec)'.format(self.timeout))
         return False
     
     def on_error(self, status):
@@ -155,7 +156,6 @@ heatmap_auth.set_access_token(access_token, access_secret)
 
 try:
     tweets_mover = pandas_to_sql()
-    tweets_mover.daemon = True # probably unnecessary
     tweets_mover.start()
     
     while True:
