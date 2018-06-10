@@ -64,15 +64,15 @@ def create_sql_database (table_name, db_filename = 'default_sql_dbname.db', on_m
             
 class pandas_to_sql(threading.Thread):
     def __init__(self):
-        pass
+        super().__init__()
+        self.dummy_df = dummy_df
     
-    def run():
+    def run(self):
         while True:
-            dummy_df.to_sql('tweets', connection, if_exists = 'append')
+            self.dummy_df.to_sql('tweets', connection, if_exists = 'append')
             logger.warning('+++++++++++++++DATA MOVED!!!!!!!!!!!!!!!!!!!!!')
             
-            global dummy_df
-            dummy_df = pd.DataFrame([], columns=['Timestamp',
+            self.dummy_df = pd.DataFrame([], columns=['Timestamp',
                                    'Longitude',
                                    'Latitude',
                                    'Language',
@@ -85,10 +85,10 @@ class pandas_to_sql(threading.Thread):
 
 class tweet_listener(tp.StreamListener):
          
-    def __init__(self, time_limit):
+    def __init__(self, timeout):
         super().__init__(self)
         self.starting_time = time.time()
-        self.time_limit = time_limit
+        self.time_limit = timeout
 
         global dummy_df
         dummy_df = pd.DataFrame([], columns=['Timestamp',
