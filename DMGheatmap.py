@@ -14,25 +14,10 @@ import pandas as pd
 import logging
 import threading
 import sys
+import login_twitter
 
 logging.basicConfig(level = logging.INFO)
 logger = logging.getLogger('heatmap')
-
-################################################################################################
-
-def retrieve_twitter_API_credentials(twitter_API_json_filename):
-    """
-     The file 'twitter_API_credentials.json' is listed in .gitignore
-     and therefore not pushed to into the GitHub repository. For illustrative
-     purposes of the JSON layout, the file 'dummy_twitter_API_credentials.json' 
-      is added.
-    """
-
-    with open(twitter_API_json_filename) as twitter_credentials:
-        twitterID = json.load(twitter_credentials)
-        
-    return twitterID['consumer_key'], twitterID['consumer_secret'], twitterID['access_token'], twitterID['access_secret']
-
 
 ############################################################################################################################3
             
@@ -161,7 +146,7 @@ class tweet_listener(tp.StreamListener):
 
 ##################################################################################################################3
 
-consumer_key, consumer_secret, access_token, access_secret  = retrieve_twitter_API_credentials('twitter_API_credentials.json')
+consumer_key, consumer_secret, access_token, access_secret  = login_twitter.retrieve_twitter_API_credentials('twitter_API_credentials.json')
 
 
 
