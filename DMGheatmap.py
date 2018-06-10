@@ -13,8 +13,9 @@ import time
 import pandas as pd
 import logging
 import threading
+import sys
 
-logging.basicConfig(level = logging.DEBUG)
+logging.basicConfig(level = logging.INFO)
 logger = logging.getLogger('heatmap')
 
 ################################################################################################
@@ -32,47 +33,56 @@ def retrieve_twitter_API_credentials(twitter_API_json_filename):
         
     return twitterID['consumer_key'], twitterID['consumer_secret'], twitterID['access_token'], twitterID['access_secret']
 
-def create_sql_database (table_name, db_filename = 'default_sql_dbname.db', on_memory=True):
-    """
-    creates an SQLite database and returns the connection and the cursor to
-    interact with it
-    """
-    
-    if on_memory == True:
-        conn = sqlite3.connect(':memory:')
-    elif on_memory == False:
-        conn = sqlite3.connect(db_filename)
-    else:
-        logger.debug('the variable "on_memory" is a boolean variable')
-        
-    c = conn.cursor()
-    c.execute('CREATE TABLE {} ('.format(table_name) + \
-            'timestamp REAL,' + \
-            'latitude REAL,' + \
-            'longitude REAL,' + \
-            'language TEXT,' + \
-            'country TEXT,' + \
-            'country_code TEXT,' + \
-            'place_name TEXT,' + \
-            'place_type TEXT)')
-    
-    conn.commit()
-    
-    return c, conn
 
 ############################################################################################################################3
             
 class pandas_to_sql(threading.Thread):
     def __init__(self):
         super().__init__()
-        self.dummy_df = dummy_df
+        self.isDaemon
+        self.event = threading.Event()
+    
+    def create_sql_database (self, table_name, db_filename = 'default_sql_dbname.db', on_memory=True):
+        """
+        creates an SQLite database and returns the connection and the cursor to
+        interact with it
+        """
+        
+        if on_memory == True:
+            conn = sqlite3.connect(':memory:')
+        elif on_memory == False:
+            conn = sqlite3.connect(db_filename)
+        else:
+            logger.debug('the variable "on_memory" is a boolean variable')
+            
+        c = conn.cursor()
+        c.execute('CREATE TABLE {} ('.format(table_name) + \
+                'timestamp REAL,' + \
+                'latitude REAL,' + \
+                'longitude REAL,' + \
+                'language TEXT,' + \
+                'country TEXT,' + \
+                'country_code TEXT,' + \
+                'place_name TEXT,' + \
+                'place_type TEXT)')
+        
+        conn.commit()
+        
+        return c, conn
     
     def run(self):
-        while True:
-            self.dummy_df.to_sql('tweets', connection, if_exists = 'append')
-            logger.warning('+++++++++++++++DATA MOVED!!!!!!!!!!!!!!!!!!!!!')
+        
+        global dummy_df
+        
+        cursor, connection = self.create_sql_database('tweets', db_filename= 'lalala.db', on_memory = False)
+        
+        while not self.event.is_set():
+            time.sleep(9)
+            logger.info('********************************************************************************************len(dummy_df): {}'.format(len(dummy_df)))
             
-            self.dummy_df = pd.DataFrame([], columns=['Timestamp',
+            dummy_df.to_sql('tweets', connection, if_exists = 'append', index = False)
+                        
+            dummy_df = pd.DataFrame([], columns=['Timestamp',
                                    'Longitude',
                                    'Latitude',
                                    'Language',
@@ -80,8 +90,15 @@ class pandas_to_sql(threading.Thread):
                                    'Country_Code',
                                    'Place_Name',
                                    'Place_Type'])
-            time.sleep(9)
-        
+            
+            logger.warning('+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ DATA MOVED!!')
+            
+        if self.event.is_set():
+            logger.info('exiting...')
+            connection.close()
+            sys.exit()
+
+
 
 class tweet_listener(tp.StreamListener):
          
@@ -145,22 +162,27 @@ class tweet_listener(tp.StreamListener):
 ##################################################################################################################3
 
 consumer_key, consumer_secret, access_token, access_secret  = retrieve_twitter_API_credentials('twitter_API_credentials.json')
-cursor, connection = create_sql_database('tweets', on_memory = True)
+
 
 
 heatmap_auth = tp.OAuthHandler(consumer_key, consumer_secret)
 heatmap_auth.set_access_token(access_token, access_secret)
 
+try:
+    tweets_mover = pandas_to_sql()
+    tweets_mover.daemon = True # probably unnecessary
+    tweets_mover.start()
+    
+    while True:
+        
+        tweet_streamer = tp.Stream(auth= heatmap_auth,listener = tweet_listener(300))
+        tweet_streamer.filter(locations=[-180,-90,180,90])
 
-tweet_streamer = tp.Stream(auth= heatmap_auth,listener = tweet_listener(300))
-
-# THREAD MOVIN DATA FROM THE PANDAS DF TO THE SQL DATABASE FIRES HERE
-#data_migrator = pandas_to_sql()
-#data_migrator.start()
-
+except KeyboardInterrupt:
+    tweets_mover.event.set()
+    
 #tweet_streamer.filter(track=['Trump'])
-tweet_streamer.filter(locations=[-180,-90,180,90])
-connection.close()
+
 
 
 
