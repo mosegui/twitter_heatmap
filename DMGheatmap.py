@@ -15,15 +15,21 @@ import logging
 import threading
 import sys
 import login_twitter
+import numpy as np
 
 logging.basicConfig(level = logging.INFO)
 logger = logging.getLogger('heatmap')
 
-############################################################################################################################3
+#==========================================================================================
+
+TWITTER_CREDENTIALS_JSON_FILE = 'twitter_API_credentials.json'
+
+
+###########################################################################################
          
 def empty_df(*args):
     """
-    return an empty dataframe with the column names passed as arguments in a list
+    returns an empty dataframe with the column names passed as arguments in a list
     """
     list_of_columns = [arg for arg in args]
     
@@ -32,10 +38,11 @@ def empty_df(*args):
 
 
 class pandas_to_sql(threading.Thread):
-    def __init__(self):
+    def __init__(self, sync_time):
         super().__init__()
         self.isDaemon
         self.event = threading.Event()
+        self.sync_time = sync_time
     
     def create_sql_database (self, table_name, db_filename = 'default_sql_dbname.db', on_memory=True):
         """
@@ -72,7 +79,7 @@ class pandas_to_sql(threading.Thread):
         cursor, connection = self.create_sql_database('tweets', db_filename= 'lolo.db', on_memory = False)
         
         while not self.event.is_set():
-            time.sleep(27)
+            time.sleep(self.sync_time)
             logger.info('********************************************************************************************len(dummy_df): {}'.format(len(dummy_df)))
             
             dummy_df.to_sql('tweets', connection, if_exists = 'append', index = False)
@@ -91,21 +98,20 @@ class pandas_to_sql(threading.Thread):
 
 class tweet_listener(tp.StreamListener):
          
-    def __init__(self, timeout):
+    def __init__(self, timeout = np.inf):
         super().__init__(self)
         self.starting_time = time.time()
         self.timeout = timeout
 
         global dummy_df
-        
         dummy_df = empty_df('Timestamp', 'Longitude', 'Latitude', 'Language',
                             'Country', 'Country_Code', 'Place_Name', 'Place_Type')
             
     def on_data(self, data):
         
         global dummy_df
-
-        while (time.time() - self.starting_time) <= self.time_limit:
+        
+        while (time.time() - self.starting_time) <= self.timeout:
             decoded_json = json.loads(data)
             try:
                 if decoded_json['place'] != None:
@@ -139,7 +145,7 @@ class tweet_listener(tp.StreamListener):
             except:
                 pass # tweets with no ['place'] key are internal API messages
             return True
-        logger.info('TIME IS UP!!! ({} sec)'.format(self.timeout))
+        logger.info('TIME IS UP!!! (timeout = {} sec)'.format(self.timeout))
         return False
     
     def on_error(self, status):
@@ -147,7 +153,7 @@ class tweet_listener(tp.StreamListener):
 
 ##################################################################################################################3
 
-consumer_key, consumer_secret, access_token, access_secret  = login_twitter.retrieve_twitter_API_credentials('twitter_API_credentials.json')
+consumer_key, consumer_secret, access_token, access_secret  = login_twitter.retrieve_twitter_API_credentials(TWITTER_CREDENTIALS_JSON_FILE)
 
 
 
@@ -155,23 +161,15 @@ heatmap_auth = tp.OAuthHandler(consumer_key, consumer_secret)
 heatmap_auth.set_access_token(access_token, access_secret)
 
 try:
-    tweets_mover = pandas_to_sql()
+    tweets_mover = pandas_to_sql(27)
     tweets_mover.start()
     
     while True:
         
-        tweet_streamer = tp.Stream(auth= heatmap_auth,listener = tweet_listener(300))
+        tweet_streamer = tp.Stream(auth= heatmap_auth,listener = tweet_listener())
         tweet_streamer.filter(locations=[-180,-90,180,90])
-
+        #tweet_streamer.filter(track=['Trump'])
+        
 except KeyboardInterrupt:
     tweets_mover.event.set()
     
-#tweet_streamer.filter(track=['Trump'])
-
-
-
-
-
-
-
-
